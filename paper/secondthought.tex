@@ -1,0 +1,234 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=*}
+\newcommand{\repo}{\url{https://github.com/alleyxd/SecondThought}}
+
+\title{SecondThought: Confidence-Gated Reasoning\\for Tool Calls in Small Local Models}
+\author{Ali Ashter\\\texttt{hello@ashter.dev}}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Letting a model think before it calls a tool improves the call, but costs six to seven times the output tokens and,
+we find, makes models call tools they should leave alone. We propose gating: make the normal no-think call, read its
+mean token log-probability, and rerun with thinking only when that confidence is low. On the Berkeley Function Calling
+Leaderboard (1,398 single-turn items including 240 where no tool fits) with Qwen3-1.7B, 4B and 8B, the call's own
+mean log-probability predicts whether it is correct with AUROC 0.82 to 0.84, and the probability of the first token
+being a tool call predicts whether a tool is needed with AUROC 0.96 to 0.98, better than asking the model directly.
+Thinking on the least confident 30\% of requests recovers 66\% and 70\% of the accuracy gain of always thinking at
+1.7B and 4B, and exceeds always thinking at 8B (0.877 against 0.874), at about half the output tokens, because it
+avoids the thinking that talks models into wrong calls. Confidence ranking beats random selection at every budget.
+The gate needs no training and no extra model; it reads numbers the server already returns. We also report twelve
+single-factor interventions on the same data. Code and every response: \repo.
+\end{abstract}
+
+\section{Introduction}
+
+Small open models now handle single tool calls well enough to run local and on-device agents. Reasoning modes make
+them better still: on our data, thinking before the call adds 3 to 5 points of accuracy on requests that need a tool.
+But it multiplies output tokens by six to seven and adds seconds of latency to every request, and it has a side
+effect we did not expect: on requests where no tool fits, thinking lowers the rate of correctly declining by about 6
+points. The model reasons its way into a call.
+
+Most requests do not need the extra reasoning; the direct call is already right. The question is which ones do. Our
+earlier work showed that a model's next-token probabilities, read in a single forward pass, are informative about its
+decisions once calibrated \cite{anydecide}. Here we use the same idea for routing: the log-probabilities of the direct
+tool call tell us how sure the model was, and we spend thinking only where it was not.
+
+Contributions:
+\begin{itemize}
+\item Two free signals from the direct call: its mean token log-probability predicts correctness, and the probability
+of the first token being a tool call predicts whether a tool is needed. Both beat asking the model.
+\item A training-free gate that thinks only on low-confidence calls, evaluated across budgets against random gating,
+always thinking and an oracle.
+\item Twelve single-factor interventions on the same data (descriptions, names, distractors, retrieval, forced
+calls, schema repair) as context for where tool calls fail.
+\end{itemize}
+
+\section{Related work}
+
+BFCL \cite{bfcl}, which grew out of Gorilla \cite{gorilla}, is the standard function-calling benchmark; we use its
+single-turn categories and matching rules. Wu et al.\ treat whether to call a tool as a decision problem
+\cite{tocall}; we give a concrete, cheap estimator of that decision. Tool choice can be read and steered from hidden
+states \cite{linear}; we read only output log-probabilities, which any OpenAI-compatible server returns. Retrieval for
+small agents \cite{dtdr,toolomni} and interface design for recovery \cite{aft} are complementary. Gating expensive
+computation on confidence is an old idea in model cascades; our contribution is showing which signals work for tool
+calls and that gating improves on always thinking rather than only approximating it. Our previous studies on
+single-pass decisions \cite{anydecide} and structured output \cite{schematax} motivate the method and setup.
+
+\section{Setup}
+
+\textbf{Data.} BFCL v3: simple (400), multiple (200), live\_simple (258), live\_multiple (300 sampled with a fixed
+seed) and irrelevance (240, where the correct behaviour is not to call). 1,398 items.
+
+\textbf{Scoring.} A BFCL-style AST check: the expected function, every argument among the accepted values, required
+arguments present, no unknown arguments. Irrelevance items score 1 for no call. We report accuracy over all 1,398
+items, so declining correctly counts.
+
+\textbf{Models.} Qwen3-1.7B, 4B and 8B \cite{qwen3} in bf16 on vLLM 0.29.0 \cite{vllm} with the Hermes tool parser,
+greedy decoding.
+
+\textbf{Signals.} From the direct (no-think) call with token log-probabilities: \emph{mean\_lp} and \emph{min\_lp},
+the mean and minimum log-probability over the generated tokens, and \emph{p\_call}, the probability that the first
+token is \texttt{<tool\_call>}. For comparison, \emph{p\_probe}: a separate one-token question asking whether any
+available tool fits (A/B), normalised over the two answers.
+
+\textbf{Gate.} Make the direct call. If it is a tool call and its mean\_lp is among the lowest $b$ fraction, rerun
+with thinking and use that answer; otherwise keep the direct answer. Requests the direct call declined are never sent
+to thinking. Cost is the output tokens of both passes.
+
+\section{Results}
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+& mean\_lp & min\_lp & p\_call & p\_probe \\
+\midrule
+\multicolumn{5}{l}{\emph{Is the direct call correct?} (tool items)} \\
+1.7B & 0.84 & 0.83 & 0.52 & 0.66 \\
+4B & 0.82 & 0.82 & 0.53 & 0.80 \\
+8B & 0.82 & 0.82 & 0.68 & 0.77 \\
+\midrule
+\multicolumn{5}{l}{\emph{Is a tool needed?} (all items)} \\
+1.7B & 0.94 & 0.93 & 0.97 & 0.82 \\
+4B & 0.94 & 0.92 & 0.98 & 0.96 \\
+8B & 0.94 & 0.92 & 0.96 & 0.94 \\
+\bottomrule
+\end{tabular}
+\caption{AUROC of each signal.}
+\label{tab:sig}
+\end{table}
+
+\subsection{The call's own log-probabilities are the best signals}
+
+The mean token log-probability of the direct call separates right from wrong calls with AUROC 0.82 to 0.84 at every
+size (Table~\ref{tab:sig}). The first-token probability of a tool call is the best signal for whether a tool is needed
+at all, 0.96 to 0.98, and it beats explicitly asking the model, which is weakest at 1.7B (0.82). Both come from the
+call the agent makes anyway, so they cost nothing extra.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lrrr}
+\toprule
+& 1.7B & 4B & 8B \\
+\midrule
+direct (no thinking) & 0.803 & 0.850 & 0.858 \\
+always think & 0.835 & 0.883 & 0.874 \\
+\midrule
+gate, 10\% budget & 0.813 & 0.863 & 0.869 \\
+gate, 20\% & 0.819 & 0.871 & 0.871 \\
+gate, 30\% & 0.824 & 0.873 & \textbf{0.877} \\
+gate, 40\% & 0.825 & 0.873 & 0.876 \\
+random, 30\% & 0.818 & 0.857 & 0.870 \\
+oracle & 0.890 & 0.921 & 0.905 \\
+\midrule
+tokens: always think & 317 & 354 & 364 \\
+tokens: gate 30\% & 161 & 179 & 188 \\
+\bottomrule
+\end{tabular}
+\caption{Accuracy over all 1,398 items. Budget is the share of requests sent to thinking. Oracle thinks exactly
+when thinking is right and direct is wrong. Tokens are mean output tokens per request; the gate counts both passes.}
+\label{tab:gate}
+\end{table}
+
+\subsection{Gating keeps most of the gain at half the cost}
+
+Table~\ref{tab:gate} shows accuracy as the thinking budget grows. At 30\%, the gate reaches 0.824, 0.873 and 0.877,
+recovering 66\% of the gain of always thinking at 1.7B and 70\% at 4B, and slightly exceeding always thinking at 8B.
+It uses 161 to 188 output tokens per request against 317 to 364 for always thinking. Random selection of the same
+number of requests does worse at every budget (0.818, 0.857 and 0.870 at 30\%), so the ranking carries the gain.
+Beyond 30\% the curve is flat: the remaining requests are mostly already correct.
+
+Requests that are not sent to thinking are exactly the direct answers, and a few of the ones that are can get worse,
+since thinking occasionally turns a correct call into a wrong one. Its value is
+choosing where to spend reasoning, not improving every response. The 8B result is the exception that shows why that
+matters: always thinking makes some declines into wrong calls, and the gate avoids those, so it beats thinking on
+everything.
+
+\subsection{Thinking hurts abstention}
+
+On the 240 irrelevance items, thinking lowers the rate of correctly declining from 0.863 to 0.800 at 1.7B, 0.879 to
+0.817 at 4B and 0.858 to 0.800 at 8B. Never sending declined requests to thinking protects these, which is a simple
+rule worth applying to any gating scheme.
+
+\subsection{Context: single-factor interventions}
+
+We also ran twelve conditions on the same items with thinking off, scoring the 1,158 tool-needing items
+(Table~\ref{tab:abl}). Removing parameter descriptions costs 16 to 18 points, renaming functions about one. Distractor
+tools hurt small models most. BM25 retrieval kept the right tool in its top five for 88\% of items and scored below
+sending all 32 distractors at 4B and 8B; an embedding retriever kept it 97\% of the time and beat sending everything.
+Forcing a call adds up to 4 points but declines nothing. Validating calls against the schema and retrying triggered on
+about 1\% of items: most failures were schema-valid calls with the wrong function or values (180, 132 and 132 base
+failures at 1.7B, 4B and 8B) or text answers with no call (58, 42 and 19), which is what the gate's thinking pass fixes.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lrrr}
+\toprule
+Condition & 1.7B & 4B & 8B \\
+\midrule
+base & 0.789 & 0.845 & 0.861 \\
+think & 0.842 & 0.896 & 0.889 \\
+no function descriptions & 0.764 & 0.824 & 0.864 \\
+no descriptions at all & 0.612 & 0.680 & 0.697 \\
+names \texttt{tool\_k} & 0.798 & 0.839 & 0.852 \\
++8 distractors & 0.715 & 0.827 & 0.839 \\
++32 distractors & 0.650 & 0.789 & 0.819 \\
++32, BM25 top 5 & 0.693 & 0.742 & 0.746 \\
++32, BM25 top 10 & 0.699 & 0.771 & 0.785 \\
++32, embedding top 5 & 0.760 & 0.814 & 0.828 \\
+\texttt{tool\_choice=required} & 0.826 & 0.867 & 0.866 \\
+validate and retry & 0.791 & 0.849 & 0.864 \\
+\bottomrule
+\end{tabular}
+\caption{Single-factor interventions, accuracy on the 1,158 tool-needing items.}
+\label{tab:abl}
+\end{table}
+
+\section{Using it}
+
+\begin{itemize}
+\item Request log-probabilities on the normal tool call; most servers return them.
+\item If the call looks unsure (low mean log-probability), retry with thinking. Calibrate the cut-off on a few dozen
+labelled requests, or start by thinking on the least confident quarter.
+\item Never send a declined request to thinking.
+\item Use the first-token probability of a tool call, not a separate yes/no question, to monitor abstention.
+\end{itemize}
+
+\section{Limitations}
+
+One model family, greedy decoding and single-turn BFCL categories; on this data thinking adds only 2 to 3 points
+overall, which bounds what any gate can gain. Multi-turn agents, where a wrong call compounds, may benefit more but
+are untested. Budgets are fixed fractions of the evaluation set; in deployment a threshold must be fixed in advance,
+which we approximate with cross-validation in the code. Latencies were measured under batched load and are not
+reported.
+
+\section{Conclusion}
+
+A tool call's own log-probabilities say when it is likely wrong and when no tool was wanted. Spending reasoning only
+on unsure calls keeps most of the benefit of thinking, at half the tokens, and avoids its habit of talking models into
+calls they should not make.
+
+\begin{thebibliography}{99}\small
+\bibitem{anydecide} A.~Ashter. Decisions in one forward pass: typed answers from local language models, and making their yes/no probabilities mean something. \url{https://github.com/alleyxd/AnyDecide}, 2026.
+\bibitem{schematax} A.~Ashter. The schema tax is a schema design tax: when constrained JSON decoding costs accuracy, and when it helps. \url{https://github.com/alleyxd/SchemaTax}, 2026.
+\bibitem{bfcl} S.~G.~Patil, H.~Mao, F.~Yan, C.~Ji, V.~Suresh, I.~Stoica, J.~E.~Gonzalez. The Berkeley Function Calling Leaderboard (BFCL): from tool use to agentic evaluation of large language models. ICML 2025.
+\bibitem{gorilla} S.~G.~Patil, T.~Zhang, X.~Wang, J.~E.~Gonzalez. Gorilla: large language model connected with massive APIs. arXiv:2305.15334, 2023.
+\bibitem{tocall} Q.~Wu, S.~Das, M.~Amani, et al. To call or not to call: a framework to assess and optimize LLM tool calling. arXiv:2605.00737, 2026.
+\bibitem{linear} Z.~Wu, Z.~Wang, S.~Cho, et al. Tool calling is linearly readable and steerable in language models. arXiv:2605.07990, 2026.
+\bibitem{dtdr} B.~Patel, D.~Belli, A.~Jalalirad, et al. Dynamic tool dependency retrieval for lightweight function calling. arXiv:2512.17052, 2025.
+\bibitem{toolomni} S.~Huang, M.~Zhang, B.~Hu, et al. ToolOmni: enabling open-world tool use via agentic learning with proactive retrieval and grounded execution. arXiv:2604.13787, 2026.
+\bibitem{aft} Z.~Wang. Callability is not operability: controlled interface interventions for LLM agents. arXiv:2608.23628, 2026.
+\bibitem{qwen3} A.~Yang, A.~Li, B.~Yang, et al. Qwen3 technical report. arXiv:2505.09388, 2025.
+\bibitem{vllm} W.~Kwon, Z.~Li, S.~Zhuang, et al. Efficient memory management for large language model serving with PagedAttention. SOSP 2023. arXiv:2309.06180.
+\end{thebibliography}
+
+\end{document}

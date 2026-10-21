@@ -1,0 +1,16 @@
+[project]
+name = "secondthought"
+version = "0.1.0"
+description = "Confidence-gated thinking for tool calls: think only when the direct call looks unsure."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Ali Ashter" }]
+dependencies = ["openai>=1.40", "sentence-transformers>=3"]
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["toolcall"]

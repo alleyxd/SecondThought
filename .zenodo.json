@@ -1,0 +1,21 @@
+{
+  "title": "SecondThought: Confidence-Gated Reasoning for Tool Calls in Small Local Models",
+  "description": "Reads a tool call's own token log-probabilities to decide when a small model should think before calling a tool. Thinking on the least confident 30% of requests keeps most of the gain of always thinking at about half the output tokens, and avoids thinking's tendency to call tools when none fit. Includes code, all responses on BFCL with Qwen3-1.7B/4B/8B, and the paper.",
+  "upload_type": "publication",
+  "publication_type": "preprint",
+  "creators": [
+    {
+      "name": "Ashter, Ali"
+    }
+  ],
+  "keywords": [
+    "tool calling",
+    "function calling",
+    "large language models",
+    "reasoning",
+    "confidence",
+    "BFCL"
+  ],
+  "license": "MIT",
+  "access_right": "open"
+}
