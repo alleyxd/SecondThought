@@ -8,3 +8,15 @@ year: 2026
 license: MIT
 repository-code: "https://github.com/alleyxd/SecondThought"
 type: software
+version: 1.0.0
+doi: 10.5281/zenodo.23580275
+preferred-citation:
+  type: article
+  title: "SecondThought: Confidence-Gated Reasoning for Tool Calls in Small Local Models"
+  authors:
+    - family-names: Ashter
+      given-names: Ali
+  year: 2026
+  doi: 10.5281/zenodo.23580273
+  publisher:
+    name: Zenodo
