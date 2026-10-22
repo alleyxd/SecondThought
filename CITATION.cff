@@ -4,7 +4,6 @@ title: "SecondThought: Confidence-Gated Reasoning for Tool Calls in Small Local 
 authors:
   - family-names: Ashter
     given-names: Ali
-year: 2026
 license: MIT
 repository-code: "https://github.com/alleyxd/SecondThought"
 type: software
