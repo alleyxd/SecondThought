@@ -27,7 +27,7 @@ tool fits), Qwen3 on vLLM, accuracy over all items:
 | output tokens: gated 30% | 161 | 179 | 188 |
 
 - The call's mean token log-probability predicts whether it's correct (AUROC 0.82 to 0.84).
-- The probability of the first token being a tool call predicts whether a tool is needed (AUROC 0.96 to 0.98), better
+- The probability of the first token being a tool call predicts whether a tool is needed (AUROC 0.95 to 0.97), better
   than asking the model.
 - Gating keeps 66 to 70% of the thinking gain at 1.7B and 4B, and beats always thinking at 8B, at about half the
   tokens. Always thinking turns some correct declines into wrong calls; the gate doesn't think on declines.
