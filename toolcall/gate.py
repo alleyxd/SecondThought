@@ -85,8 +85,16 @@ def random_gate(items, rate, ta, seed=0):
 
 
 def auroc(pos, neg):
-    ranked = sorted([(v, 1) for v in pos] + [(v, 0) for v in neg])
-    s = sum(i for i, (_, lab) in enumerate(ranked, 1) if lab)
+    # tied values share their average rank, so a tie counts as half, whichever label it has
+    vals = sorted(pos + neg)
+    rank, i = {}, 0
+    while i < len(vals):
+        j = i
+        while j < len(vals) and vals[j] == vals[i]:
+            j += 1
+        rank[vals[i]] = (i + 1 + j) / 2
+        i = j
+    s = sum(rank[v] for v in pos)
     return (s - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg))
 
 

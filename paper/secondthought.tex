@@ -21,7 +21,7 @@ we find, makes models call tools they should leave alone. We propose gating: mak
 mean token log-probability, and rerun with thinking only when that confidence is low. On the Berkeley Function Calling
 Leaderboard (1,398 single-turn items including 240 where no tool fits) with Qwen3-1.7B, 4B and 8B, the call's own
 mean log-probability predicts whether it is correct with AUROC 0.82 to 0.84, and the probability of the first token
-being a tool call predicts whether a tool is needed with AUROC 0.96 to 0.98, better than asking the model directly.
+being a tool call predicts whether a tool is needed with AUROC 0.95 to 0.97, better than asking the model directly.
 Thinking on the least confident 30\% of requests recovers 66\% and 70\% of the accuracy gain of always thinking at
 1.7B and 4B, and exceeds always thinking at 8B (0.877 against 0.874), at about half the output tokens, because it
 avoids the thinking that talks models into wrong calls. Confidence ranking beats random selection at every budget.
@@ -94,13 +94,13 @@ to thinking. Cost is the output tokens of both passes.
 \midrule
 \multicolumn{5}{l}{\emph{Is the direct call correct?} (tool items)} \\
 1.7B & 0.84 & 0.83 & 0.52 & 0.66 \\
-4B & 0.82 & 0.82 & 0.53 & 0.80 \\
-8B & 0.82 & 0.82 & 0.68 & 0.77 \\
+4B & 0.82 & 0.82 & 0.53 & 0.66 \\
+8B & 0.82 & 0.82 & 0.63 & 0.76 \\
 \midrule
 \multicolumn{5}{l}{\emph{Is a tool needed?} (all items)} \\
-1.7B & 0.94 & 0.93 & 0.97 & 0.82 \\
-4B & 0.94 & 0.92 & 0.98 & 0.96 \\
-8B & 0.94 & 0.92 & 0.96 & 0.94 \\
+1.7B & 0.94 & 0.93 & 0.97 & 0.81 \\
+4B & 0.94 & 0.92 & 0.97 & 0.95 \\
+8B & 0.94 & 0.92 & 0.95 & 0.94 \\
 \bottomrule
 \end{tabular}
 \caption{AUROC of each signal.}
@@ -111,7 +111,7 @@ to thinking. Cost is the output tokens of both passes.
 
 The mean token log-probability of the direct call separates right from wrong calls with AUROC 0.82 to 0.84 at every
 size (Table~\ref{tab:sig}). The first-token probability of a tool call is the best signal for whether a tool is needed
-at all, 0.96 to 0.98, and it beats explicitly asking the model, which is weakest at 1.7B (0.82). Both come from the
+at all, 0.95 to 0.97, and it beats explicitly asking the model, which is weakest at 1.7B (0.81). Both come from the
 call the agent makes anyway, so they cost nothing extra.
 
 \begin{table}[t]
