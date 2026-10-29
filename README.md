@@ -1,6 +1,6 @@
 # SecondThought
 
-[![Paper DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23580273.svg)](https://doi.org/10.5281/zenodo.23580273)
+[![Paper DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23580272.svg)](https://doi.org/10.5281/zenodo.23580272)
 [![Code DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23580275.svg)](https://doi.org/10.5281/zenodo.23580275)
 
 Thinking before a tool call makes small models more accurate, but it costs six to seven times the output tokens and
@@ -10,7 +10,7 @@ Make the normal no-think tool call with log-probabilities on. If its mean token 
 thinking. If the model declined to call, keep the decline. No training, no extra model: it uses numbers the server
 already returns.
 
-Paper: [`paper/secondthought.pdf`](paper/secondthought.pdf) ([Zenodo](https://doi.org/10.5281/zenodo.23580273))
+Paper: [`paper/secondthought.pdf`](paper/secondthought.pdf) ([Zenodo](https://doi.org/10.5281/zenodo.23580272))
 
 ## Results
 
@@ -63,8 +63,8 @@ bounds what any gate can gain; multi-turn agents may benefit more.
   title  = {SecondThought: Confidence-Gated Reasoning for Tool Calls in Small Local Models},
   author = {Ashter, Ali},
   year   = {2026},
-  doi    = {10.5281/zenodo.23580273},
-  url    = {https://doi.org/10.5281/zenodo.23580273}
+  doi    = {10.5281/zenodo.23580272},
+  url    = {https://doi.org/10.5281/zenodo.23580272}
 }
 ```
 
